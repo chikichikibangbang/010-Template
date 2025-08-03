@@ -1,0 +1,480 @@
+//------------------------------------------------
+//--- 010 Editor v9.0.2 Binary Template
+//
+//      File: 
+//   Authors: 诸葛不太亮
+//   Version: 1.1
+//   Purpose: MHWilds jcns file editing
+//  Category: MHWilds jcns
+// File Mask: *.jcns.*
+//  ID Bytes: 6A 63 6E 73
+//   History: April 8, 2025      
+//------------------------------------------------
+local uint64 i<hidden=true>, j<hidden=true>, k<hidden=true>, posBack<hidden=true>, posBackNest<hidden=true>;
+local uint64 offsetOffset[5000]<hidden=true>, offset[5000]<hidden=true>, it<hidden=true> = 0;
+
+typedef ubyte BOOL <read=ReadBOOL, write=WriteBOOL>;
+
+string ReadBOOL(BOOL &b) {
+    if (b == 1)
+        return "True";
+    return "False";
+}
+
+void WriteBOOL(BOOL &b, string s) {
+    if (doesExist(Lower(s), "true") != -1 || Atoi(s) >= 1)
+        b = 1;
+    else b = 0;
+}
+
+
+typedef struct(int64 addOffset) { 
+    uint64 offset<format=hex>;
+    FSeek(offset + addOffset);
+    if (offset > 0 && offset < FileSize())
+        wstring String;
+    else
+        local wstring String = "";
+    FSeek(startof(offset)+8);
+} StringRead <read=ReadStringRead, write=WriteStringRead, bgcolor=0x263f2a>;
+
+    wstring ReadStringRead(StringRead &st) { 
+        if (exists(st.String)) 
+            return st.String;
+        local string s;
+        if (exists(st.offset))
+            SPrintf(s, "%i", st.offset); 
+        return s; 
+    }
+    
+    void WriteStringRead(StringRead &st, string s) { 
+        if (exists(st.String))
+            st.String = s; 
+        else if (exists(st.offset))
+            st.offset = Atoi(s);
+    }
+
+typedef struct(int64 addOffset) {
+    
+    uint64 offset<format=hex>;
+    FSeek(offset + addOffset);
+    if (offset > 0 && offset < FileSize())
+        wstring String<bgcolor=0xff5656>;
+    else
+        local wstring String<bgcolor=0xff5656>;
+    FSeek(startof(offset)+8);
+} StringRead2 <read=ReadStringRead2, write=WriteStringRead2>;
+
+    wstring ReadStringRead2(StringRead2 &st) { 
+        if (exists(st.String)) 
+            return st.String;
+        local string s;
+        if (exists(st.offset))
+            SPrintf(s, "%i", st.offset); 
+        return s; 
+    }
+    
+    void WriteStringRead2(StringRead2 &st, string s) { 
+        if (exists(st.String))
+            st.String = s; 
+        else if (exists(st.offset))
+            st.offset = Atoi(s);
+    }
+
+typedef byte BLANK <name=readBLANK, read=readBLANK>;
+
+    string readBLANK(BLANK &ref) { FSeek(startof(ref)); return " ";}
+    
+    void blank() { BLANK blank; FSkip(-1); }
+
+
+typedef struct {
+    //uint64 Offset1<format=hex, hidden=true>;   
+    //uint64 Offset3<format=hex, hidden=true>;   
+    uint64 Offset4<format=hex>;
+    //offset[it] = boneHdrOff; offsetOffset[it] = FTell() - 8; it++; 
+
+    uint64 ConstraintGroupOffset<format=hex>; //ConstraintGroupStartOffset? 包括HashGroup
+    //offset[it] = ConstraintGroupOffset; offsetOffset[it] = FTell() - 8; it++;
+
+    uint64 Offset6<format=hex>; //ConstraintGroupOverOffset? 包括HashGroup
+    uint64 Offset7<format=hex>;
+    uint64 Offset8<format=hex>;
+    uint64 Offset9<format=hex>;
+    uint64 Offset10<format=hex>;
+    uint64 Offset11<format=hex>;
+    uint64 Offset12<format=hex>;
+    uint64 Offset13<format=hex>; //额外调用的文件路径偏移值 //游戏内只有ch90_161_0000_RS.jcns.29的Offset13不为零
+    uint64 Offset14<format=hex>;
+    uint64 HashGroupOffset<format=hex>;
+} HeaderOffset;
+
+struct {
+    uint32 Version;
+    char   FileType[4] <name="File Type">;;
+    FSkip(8);
+    uint64 headeroffset1<format=hex>;
+    FSkip(8);
+    uint64 headeroffset2<format=hex>;
+    uint64 headeruint64;
+    uint64 OffsetCount;
+    FSkip(8);   
+    uint64 Offset2<format=hex>;
+    FSkip(8);
+    HeaderOffset headeroffset <name="Offset">;
+    ushort unknCount4<comment="Offset4跳转位置的计数值">; //游戏内只有ch90_161_0000_RS.jcns.29的unknCount4不为零
+    ushort ConstraintGroupCount;
+    ushort ObjectCount;
+    ushort unknCount6<comment="Offset6跳转位置的计数值">; //游戏内只有it6017_0000_0.jcns.29的unknCount6不为零
+    ushort unknCount7<comment="Offset7跳转位置的计数值">;
+    ushort unknCount8<comment="Offset8跳转位置的计数值">;
+    ushort unknCount9<comment="Offset9跳转位置的计数值">;
+    ushort unknCount10<comment="Offset10跳转位置的计数值">;
+    ushort unknCount11<comment="Offset11跳转位置的计数值">;
+    ushort unknCount12<comment="Offset12跳转位置的计数值">;
+    //ubyte unknCount13;
+    ubyte unknCount14<comment="Offset14跳转位置的计数值">;
+    ubyte  unkn[3];
+    FSkip(8); //这8个字节在所有的jcns文件中都为0，暂时按跳过处理
+     
+}Header<name="Header", bgcolor=0x93671a>;
+
+
+typedef struct {
+	float x;
+    float y;
+    float z;
+} AXIS;
+
+typedef struct {
+	float x;
+    float y;
+    float z;
+    float w;
+} ROTATION;
+
+
+if(Header.unknCount4){
+    FSeek(Header.headeroffset.Offset4);
+    struct{
+        for(i = 0; i < Header.unknCount4; i++){
+            struct Group1{
+                struct GroupHeader{
+                    StringRead ObjectName(0)<name="ObjectName", bgcolor=0x5656ff>;
+                    offset[it] = ObjectName.offset; offsetOffset[it] = FTell() - 8; it++;
+                    StringRead Object1Name(0)<name="Object1Name", bgcolor=0x56ff56>;
+                    offset[it] = Object1Name.offset; offsetOffset[it] = FTell() - 8; it++;
+                    StringRead Object2Name(0)<name="Object2Name", bgcolor=0xff5656>;
+                    offset[it] = Object2Name.offset; offsetOffset[it] = FTell() - 8; it++;
+                    uint64 NameOverOffset<format=hex>;
+                    ROTATION rotation1 <name="Rotation1?", open=true>;
+                    //ROTATION rotation2 <name="Rotation2?", open=true>;
+                    AXIS axis1 <name="Axis1?">;
+                    FSkip(4);
+                    //uint unknint1;
+                    //float unknfloat1;
+                    //uint unknhash1;
+                    AXIS axis2 <name="Axis2?">;
+                    FSkip(4);
+                    //uint unknint2;
+                    //float unknfloat2;
+                    //uint unknhash2;
+                    AXIS axis3 <name="Axis3?">;
+                    FSkip(4);
+                    uint ObjectHash<format=hex, bgcolor=0x5656ff>;
+                    uint Object1Hash<format=hex, bgcolor=0x56ff56, comment="mesh中的某个骨骼名或mdf2中的某个材质名的hash, 也可能按照组合名称的hash值计算">;
+                    uint Object2Hash<format=hex, bgcolor=0xff5656, comment="mesh中的某个骨骼名或mdf2中的某个材质名的hash, 也可能按照组合名称的hash值计算">;
+                    FSkip(4);
+                    float rad;
+                    byte unknbyte[12];
+                }header <name="GroupHeader", read=ReadGroupHeader, bgcolor=0xffff56>;  
+           
+            }group4 <name="Group4", bgcolor=0xffff56>;
+        }
+    }group4 <name="Group4">;
+}
+
+//游戏内只有ch90_161_0000_RS.jcns.29出现了Group4
+
+if(Header.ConstraintGroupCount){
+    FSeek(Header.headeroffset.ConstraintGroupOffset);
+    struct{
+        for(i = 0; i < Header.ConstraintGroupCount; i++){
+            struct ConstraintGroup{
+				struct ConstraintHeader{
+					uint64 beforeHdrOffset<format=hex>;  ////游戏内只有ch90_161_0000_RS.jcns.29的beforeHdrOffset不为0
+                    offset[it] = beforeHdrOffset; offsetOffset[it] = FTell() - 8; it++;
+					uint64 ConstraintNodeOffset<format=hex>;
+                    offset[it] = ConstraintNodeOffset; offsetOffset[it] = FTell() - 8; it++;
+					StringRead ObjectName(0)<name="ObjectName", bgcolor=0x5656ff>;
+                    offset[it] = ObjectName.offset; offsetOffset[it] = FTell() - 8; it++;
+                    StringRead ChildObjectName(0)<name="ChildObjectName", bgcolor=0x56ff56>;
+                    offset[it] = ChildObjectName.offset; offsetOffset[it] = FTell() - 8; it++;
+
+                    uint32 ObjectHash<format=hex, bgcolor=0x5656ff, comment="mesh中的某个骨骼名或mdf2中的某个材质名的hash, 也可能按照组合名称的hash值计算">; //也可能是pfb中的某个类名，参考ch90_154_0000_zivaChian_BlendRate_JointConstraints.jcns.29
+					uint32 ChildObjectHash<format=hex, bgcolor=0x56ff56, comment="上方材质的某个材质属性名的hash">; //也可能是pfb中的某个类的子属性名，参考ch90_154_0000_zivaChian_BlendRate_JointConstraints.jcns.29
+                    ubyte  beforeHdrCount;
+                    ubyte  ConstraintNodeCount;
+					ubyte  ukn1[6];
+                    //ROTATION rotation <name="Rotation?">;
+                    float  unk2[6];
+                    
+                    ubyte  ukn3[8];
+				}constraintheader <name="Constraint Header", read=ReadConstraintHeader, bgcolor=0xffff56>;
+				posBack = FTell();
+                if(constraintheader.beforeHdrCount){
+					FSeek(constraintheader.beforeHdrOffset);
+					
+                    for(j = 0; j < constraintheader.beforeHdrCount; j++){
+                        struct BeforeNode{
+						    ubyte unkn1[16];
+                            float f;
+                            ubyte unkn2[4];
+                        }beforenode <name="Before Node", open=true, bgcolor=0xffff56>; //游戏内只有ch90_161_0000_RS.jcns.29出现了这个结构
+                    }
+		
+				}
+
+				if(constraintheader.ConstraintNodeCount){
+                    FSeek(constraintheader.ConstraintNodeOffset);
+
+                    for(j = 0; j < constraintheader.ConstraintNodeCount; j++){
+						struct ConstraintNode{
+                            uint64 off<format=hex>; 
+                            StringRead2 TargetObjectName(0)<name="TargetObjectName">;
+                            offset[it] = TargetObjectName.offset; offsetOffset[it] = FTell() - 8; it++;
+							
+                            uint32 TargetObjectHash<format=hex, bgcolor=0xff5656, comment="mesh中的某个骨骼名的hash">;
+                            ushort extracount;
+                            ushort extracount1; //游戏内只有ch90_154_0000_zivaChian_BlendRate_JointConstraints.jcns.29的extracount1不为零
+                            byte b[8];
+                            //uint unkn;
+                            float f1,f2,f3,f4,f5,f6;
+                            ROTATION rotation <name="Rotation?">;
+
+                            if(off){
+                                FSeek(off);
+                                struct{
+                                    for(k = 0; k < extracount; k++){
+                                        struct ExtraData{
+                                            float F1;
+                                            float F2;
+                                            float F3;
+                                            float F4;
+                                            float F5;
+                                            float F6;                                                   
+                                            uint U1;
+                                       }extradata <name="Extra Data", open=true>;         
+                                    }                      
+                                }extradatas <name="Extra Datas", bgcolor=0x00003f>;                                
+                            }                            
+                            //blank();
+						}constraintnode <name="Constraint Node", read=ReadConstraintNode, open=true, bgcolor=0xffff56>;
+                    }
+                    blank();
+                }
+            FSeek(posBack);
+            }constraintgroup <name="Constraint Group", read=ReadConstraintGroup>;
+        }
+    }constraintgroups<name="Constraint Groups">;
+}
+
+
+if(Header.ObjectCount){
+    FSeek(Header.headeroffset.HashGroupOffset);
+    struct{
+        for(i = 0; i < Header.ObjectCount; i++){
+            struct HashGroup{
+                uint64 ObjectHashOffset<format=hex, bgcolor=0x4a2d56>;
+                uint TargetObjectCount<bgcolor=0x4a2d56>;
+                FSkip(4);
+
+                posBack = FTell();
+                FSeek(ObjectHashOffset);
+
+                uint32 ObjectHash<format=hex, bgcolor=0x5656ff, comment="mesh中的某个骨骼名或mdf2中的某个材质名的hash, 也可能按照组合名称的hash值计算">; //也可能是pfb中的某个类名，参考ch90_154_0000_zivaChian_BlendRate_JointConstraints.jcns.29
+                for(j = 0; j < TargetObjectCount; j++){
+                    uint32 TargetObjectHash<format=hex, bgcolor=0xff5656, comment="mesh中的某个骨骼名的hash">; //也可能是pfb中的某个类的子属性名，参考ch90_154_0000_zivaChian_BlendRate_JointConstraints.jcns.29
+                }
+                FSeek(posBack);
+            }hashgroup <name="Hash Group">;
+        }
+    }hashgroups<name="Hash Groups">;
+}
+
+//一般来说ConstraintGroups和HashGroups会一起出现
+
+if(Header.unknCount6){
+    FSeek(Header.headeroffset.Offset6);
+    struct{
+        for(i = 0; i < Header.unknCount6; i++){
+            struct Group6{
+                uint64 ObjectOffset<format=hex>;    
+                ushort unknint;
+                ushort ObjectCount;
+                FSkip(4);
+
+                posBack = FTell();
+                FSeek(ObjectOffset);
+
+                for(j = 0; j < ObjectCount; j++){
+                    uint32 ObjectHash<format=hex, bgcolor=0xff5656>;
+                }
+                FSeek(posBack);
+            }group6 <name="Group6", bgcolor=0xccccff>;
+        }
+    }group6 <name="Group6">;
+}
+
+//游戏内只有it6017_0000_0.jcns.29出现了Group6
+
+if(Header.unknCount7){
+    FSeek(Header.headeroffset.Offset7);
+    struct{
+        for(i = 0; i < Header.unknCount7; i++){
+            struct Group7{
+                ROTATION rotation1 <name="Rotation1?">;
+                ROTATION rotation2 <name="Rotation2?">;
+                uint32 ObjectHash<format=hex, bgcolor=0x5656ff, comment="mesh中的某个骨骼名的hash">;
+                uint32 TargetObjectHash<format=hex, bgcolor=0xff5656, comment="mesh中的某个骨骼名的hash">;
+                ROTATION rotation3 <name="Rotation3?">;
+            }group7 <name="Group7", bgcolor=0x00bfbf>;
+        }
+    }group7 <name="Group7">;
+}
+
+if(Header.unknCount8){
+    FSeek(Header.headeroffset.Offset8);
+    struct{
+        for(i = 0; i < Header.unknCount8; i++){
+            struct Group8{
+                byte b1, b2, b3, b4, b5, b6, b7, b8;
+            }group8 <name="Group8", bgcolor=0x007f3f>;
+        }
+    }group8 <name="Group8">;
+}
+
+//一般来说Group7和Group8会一起出现
+
+if(Header.unknCount9){
+    FSeek(Header.headeroffset.Offset9);
+    struct{
+        for(i = 0; i < Header.unknCount9; i++){
+            struct Group9{
+                uint64 TargetObjectOffset<format=hex>;
+                uint32 ObjectHash<format=hex, bgcolor=0x5656ff, comment="mesh中的某个骨骼名的hash">;
+                uint TargetObjectCount;
+                
+                posBack = FTell();
+                FSeek(TargetObjectOffset);
+
+                for(j = 0; j < TargetObjectCount; j++){
+                    struct{                  
+                        uint TargetObjectIndex<comment="对应Group10里的TargetObjectHash序号">; 
+                        float Weight; //每一组的所有Weight数值加起来应该为1                          
+                    }targetobject <name="TargetObject", open=true>;
+                }
+                blank();               
+            }group9 <name="Group9", bgcolor=0x4a2d56>;
+            FSeek(posBack);
+        }    
+    }group9 <name="Group9">;
+}
+
+
+if(Header.unknCount10){
+    FSeek(Header.headeroffset.Offset10);
+    struct{
+        for(i = 0; i < Header.unknCount10; i++){
+            uint32 TargetObjectHash<format=hex, bgcolor=0xb366ff, comment="mesh中的某个骨骼名的hash">;       
+        }
+    }group10 <name="Group10">;
+}
+
+//一般来说Group9和Group10会一起出现
+
+if(Header.unknCount11){
+    FSeek(Header.headeroffset.Offset11);
+    struct{
+        for(i = 0; i < Header.unknCount11; i++){
+            struct Group11{
+                uint64 unknHashOffset<format=hex>;
+
+                posBack = FTell();
+                FSeek(unknHashOffset);
+
+                uint32 unknHash<format=hex, bgcolor=0xff5656>;                   
+                AXIS axis <name="Axis?">;
+
+                FSeek(posBack);
+
+                uint32 ObjectHash1<format=hex, bgcolor=0x5656ff>;
+                                                                                     
+                uint64 skipzero <hidden=true>;
+                uint32 ObjectHash2<format=hex, bgcolor=0x5656ff>;  
+
+                float f1, f2, f3, f4, f5, f6, f7, f8, f9, f10;  
+                byte b1, b2; 
+                FSkip(14);
+
+            }group11 <name="Group11", bgcolor=0x4a2d56>;
+        }
+    }group11 <name="Group11">;
+}
+
+if(Header.unknCount12){
+    FSeek(Header.headeroffset.Offset12);
+    struct{
+        for(i = 0; i < Header.unknCount12; i++){
+            struct{
+                uint32 TargetObjectHash<format=hex, comment="mesh中的某个骨骼名的hash">;    
+                uint32 ObjectHash<format=hex, comment="mdf2中的某个材质名的hash">;  
+                uint32 ChildObjectHash<format=hex, comment="上方材质的某个材质属性名的hash">; 
+                //ubyte b1, b2, b3, b4;  
+                BOOL bool1<comment="是否影响上方材质属性的某个子条目">;
+                BOOL bool2<comment="是否影响上方材质属性的某个子条目">;
+                BOOL bool3<comment="是否影响上方材质属性的某个子条目">;
+                BOOL bool4<comment="是否影响上方材质属性的某个子条目">;
+            }group12 <name="Group12", bgcolor=0xb366ff>;
+        }
+    }group12 <name="Group12">;
+}
+
+if(Header.headeroffset.Offset13){
+    FSeek(Header.headeroffset.Offset13);
+    struct{        
+        struct Group13{  
+            StringRead ObjectName(0)<name="FilePath", bgcolor=0x5656ff>;
+            offset[it] = ObjectName.offset; offsetOffset[it] = FTell() - 8; it++;                      
+        }group13 <name="Group13", bgcolor=0x4a2d56>;           
+    }group13 <name="Group13">;
+}
+
+//游戏内只有ch90_161_0000_RS.jcns.29出现了Group13
+
+if(Header.unknCount14){
+    FSeek(Header.headeroffset.Offset14);
+    struct{
+        for(i = 0; i < Header.unknCount14; i++){
+            uint Index<bgcolor=0x66b3ff>;       
+        }
+    }group14 <name="Group14">;
+}
+
+
+string ReadGroupHeader(GroupHeader &a) {
+    return ReadStringRead(a.ObjectName);
+}
+
+string ReadConstraintHeader(ConstraintHeader &a) {
+    return ReadStringRead(a.ObjectName);
+}
+
+string ReadConstraintNode(ConstraintNode &a) {
+    return ReadStringRead2(a.TargetObjectName);
+}
+
+string ReadConstraintGroup(ConstraintGroup &b) {
+    return ReadConstraintHeader(b.constraintheader);
+}
+

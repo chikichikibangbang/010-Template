@@ -3,12 +3,12 @@
 //
 //      File: MHW_MOD3.bt
 //   Authors: 诸葛不太亮(korone)
-//   Version: 1.0
+//   Version: 1.1
 //   Purpose: MHW MOD3 File Editing
 //  Category: MHW MOD3
 // File Mask: *.mod3*
 //  ID Bytes: 4D 4F 44 00
-//   History: September 12, 2025      
+//   History: September 13, 2025      
 //------------------------------------------------
 LittleEndian();
 
@@ -754,6 +754,21 @@ string readBBoxInfo(BBoxInfo &bb){
             bb.boneID);
     return s;
 }
+typedef struct {
+	ushort unkn1 : 1;
+    ushort unkn2 : 1;
+    ushort unkn3 : 1;
+	ushort weightCount : 13; 
+}WEIGHTDYNAMICS;
+
+string readWeightDynamics(WEIGHTDYNAMICS &wd){
+    string s;
+    ushort temp;
+    temp = wd.weightCount;
+    if(wd.weightCount > 8){temp = 8;}
+    SPrintf( s, "weightCount: %u    raw: %u", temp, wd.weightCount);
+    return s;
+}
 struct MeshInfo{
     ushort  shadowFlag;
     ushort  vertexCount;
@@ -762,7 +777,8 @@ struct MeshInfo{
     ushort  lod <bgcolor=0x5656ff>;
     //LOD lod <format=binary, name="meshLOD">;
     ushort  unkn1;
-    ushort  weightDynamics <bgcolor=0x5656ff>;
+    //ushort  weightDynamics <bgcolor=0x5656ff>;
+    WEIGHTDYNAMICS weightDynamics <format=binary, name="weightDynamics", bgcolor=0x5656ff, read=readWeightDynamics>;
     ubyte   blockSize;
     ubyte   renderMode;
     uint    vertexSub;

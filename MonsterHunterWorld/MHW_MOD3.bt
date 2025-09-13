@@ -3,7 +3,7 @@
 //
 //      File: MHW_MOD3.bt
 //   Authors: 诸葛不太亮(korone)
-//   Version: 1.1
+//   Version: 1.2
 //   Purpose: MHW MOD3 File Editing
 //  Category: MHW MOD3
 // File Mask: *.mod3*
@@ -143,7 +143,7 @@ FSeek(0);
 Header header <name="Header", bgcolor=0x93671a, read=readFileHeader>;
 string readFileHeader(Header &h){
     string s;
-    SPrintf( s, "bone: %d    mesh: %d    material: %d    vertex: %d    face: %d    group: %d    lod: %d", 
+    SPrintf( s, "bone: %d    mesh: %d    material: %d    vertex: %u    face: %u    group: %u    lod: %d", 
             h.boneCount, h.meshCount, h.materialCount, h.vertexCount, h.faceCount/3, h.groupCount, h.lodCount);
     return s;
 }
@@ -208,9 +208,11 @@ if (header.groupOffset && header.groupCount) {
 
 string readMeshGroup(MeshGroup &mg){
     string s;
-    SPrintf( s, "groupID: %03d", mg.groupID);
+    SPrintf( s, "groupID: %03u    x: %6.2f    y: %6.2f    z: %6.2f    r: %6.2f", 
+            mg.groupID, mg.sphere.x, mg.sphere.y, mg.sphere.z, mg.sphere.r);
     return s;
-}
+} 
+      
 
 struct MaterialName{
     char  name[128];
@@ -741,8 +743,8 @@ string readFaceInfo(FaceInfo &fb){
     return s;
 }
 struct BBoxInfo{
-    uint  boneID;
-    FSkip(12);
+    ushort  boneID;
+    FSkip(14);
     Sphere  sphere <name="Sphere", bgcolor=0xaa56ff, read=readSphere>;
     Box box <name="AABB", bgcolor=0x56aaff, read=readBox>;
     Matrix OBBMatrix <name="OBB_Matrix", bgcolor=0xffaa56, read=readMatrix>; 
@@ -793,9 +795,11 @@ struct MeshInfo{
     ushort  meshID;
     ushort  vertexMinID;
     ushort  vertexMaxID;
-    FSkip(4);
-    ubyte  unkn3[8];
-    ubyte  unkn4[20];
+    FSkip(8);
+    ubyte  unkn3[4];
+    uint  beforeVertexCount <bgcolor=0xaa56ff>;
+    //ubyte  unkn4[16];
+    FSkip(16);
     local ubyte  valid = 1;
     
     local string  blockTypeName = BlockTypeToString(blockType);
@@ -875,27 +879,45 @@ if (header.meshOffset && header.meshCount) {
         struct{
             for(i = 0; i < header.meshCount; i++){
                 FSeek(header.meshOffset + i * 80);
-                MeshInfo meshinfo <name="MeshInfo", read=readMeshInfo>; 
+                MeshInfo meshinfo <name="MeshInfo", bgcolor=0x93671a, read=readMeshInfo>; 
             };          
         }MeshInfos <name="MeshInfos", bgcolor=0x263f2a>;
         struct{
             uint    count;
-            for(i = 0; i < count; i++){
-                BBoxInfo bboxinfo <name="BBoxInfo", read=readBBoxInfo>; 
-            };          
+            if(count){
+                for(i = 0; i < count; i++){
+                    BBoxInfo bboxinfo <name="BBoxInfo", read=readBBoxInfo>; 
+                }; 
+            }         
         }BBoxInfos <name="BBoxInfos", bgcolor=0x263f2a>;
     }Mesh <name="Meshs">;
 }
 
+const ubyte printType = 0; //修改此值以改变readMeshInfo的打印类型
 string readMeshInfo(MeshInfo &mi){
     string s;
-    string mn = "";
+    string mn;
+
     if(mi.materialID < header.materialCount){
         mn = Materials.materialName[mi.materialID].name;
     }
     if (mi.valid) {
-        SPrintf( s, "lod: %05d    vertex: %d    face: %d    block: %s    material: %s    groupID: %03d    shadowFlag: %03d    renderMode: %3d    meshID: %03d", 
-                mi.lod, mi.vertexCount, mi.faceCount/3, BlockTypeToString(mi.blockType), mn, mi.groupID, mi.shadowFlag, mi.renderMode, mi.meshID);
+        if (printType == 0) {
+            SPrintf( s, "lod: %05d    vertex: %d    face: %u    block: %s    material: %s    groupID: %03d    shadowFlag: %03d    renderMode: %03d    meshID: %03d", 
+                    mi.lod, mi.vertexCount, mi.faceCount/3, BlockTypeToString(mi.blockType), mn, mi.groupID, mi.shadowFlag, mi.renderMode, mi.meshID);
+        }
+        else if(printType == 1) {
+            SPrintf( s, "blockSize: %d    vertexCount: %d    vertexSub: %u    vertexBase: %u    vertexOffset: %u", 
+                    mi.blockSize, mi.vertexCount, mi.vertexSub, mi.vertexBase, mi.vertexOffset);
+        }
+        else if(printType == 2) {
+            SPrintf( s, "faceCount: %u    beforeFaceCount: %u    vertexCount: %d    beforeVertexCount: %u", 
+                    mi.faceCount/3, mi.beforeFaceCount/3, mi.vertexCount, mi.beforeVertexCount);
+        }
+        else if(printType == 3) {
+            SPrintf( s, "vertexCount: %d    vertexSub: %u    vertexMinID: %d    vertexMaxID: %d", 
+                    mi.vertexCount, mi.vertexSub, mi.vertexMinID, mi.vertexMaxID);
+        }
     }
     else {
         SPrintf(s, "invalid mesh");
@@ -919,7 +941,7 @@ if (header.vertexRemapOffset && header.meshCount) {
             }
         }
         ubyte   unkn2[16];
-    }VertexRemap <name="VertexRemap", bgcolor=0x263f2a>; //暂不清楚这个表的具体含义
+    }VertexRemap <name="VertexRemap", bgcolor=0x263f2a>; //暂不清楚这个表的具体含义，猜测是平滑法向用的，因为表中有对应映射的点都在UV孤岛边界，如果不勾选自动平滑的话，边界的法向就会不一致
 }
 
 Printf("Template finished executing.\n");

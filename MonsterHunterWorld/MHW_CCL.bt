@@ -3,7 +3,7 @@
 //
 //      File: MHW_CCL.bt
 //   Authors: 诸葛不太亮(korone)
-//   Version: 1.0
+//   Version: 1.1
 //   Purpose: MHW CCL File Editing
 //  Category: MHW CCL
 // File Mask: *.ccl.*
@@ -13,19 +13,15 @@
 LittleEndian();
 
 local int i <hidden=true>, j <hidden=true>, k <hidden=true>, m <hidden=true>;
+local int64 fileSize = FileSize();  
 
 typedef struct {
 	float x <bgcolor=0x5656ff>;
     float y <bgcolor=0x56ff56>;
     float z <bgcolor=0xff5656>;
-} HEADOFFSET;
+} OFFSET;
 
-typedef struct {
-	float x <bgcolor=0x5656ff>;
-    float y <bgcolor=0x56ff56>;
-    float z <bgcolor=0xff5656>;
-} TAILOFFSET;
-
+FSeek(0);  
 struct{
     char    FileType[4] <name="File Type">; //Please do not modify this value or the model cannot be loaded.
                                             //请不要修改此值,否则模型无法加载.
@@ -52,9 +48,9 @@ struct{
                                                                       //0为单球体,1为胶囊,其他值无碰撞.若为单球体,则只有头骨碰撞体生效.
 
     byte    placeholder[7] <hidden=true, bgcolor=0x8d56a5>;
-    HEADOFFSET HeadOffset <name="Head Collision Offset">; //Offset value of head collision position in space.//头骨的在空间中的位置偏移值. 
+    OFFSET HeadOffset <name="Head Collision Offset">; //Offset value of head collision position in space.//头骨的在空间中的位置偏移值. 
     float    skipzero <hidden=true>;
-    TAILOFFSET TailOffset <name="Tail Collision Offset">; //Offset value of tail collision position in space.//尾骨的在空间中的位置偏移值. 
+    OFFSET TailOffset <name="Tail Collision Offset">; //Offset value of tail collision position in space.//尾骨的在空间中的位置偏移值. 
     
     float CollisionRadius <name="float Collision Radius", bgcolor=0x56ffff>; //The radius of the collision, while controlling the radius of the sphere and two ends of the capsule.
                                                                              //碰撞体半径,同时控制单球体的半径和胶囊的两端半径.
@@ -65,24 +61,30 @@ struct{
 };   
 
 struct {
+    while (FTell() < fileSize) {
+        Collision collision <name="Collision", bgcolor=0x263f2a, read=ReadID>;
+    }
+} Collisions <name="Collisions">;
+/*
+struct {
     for (i=0; i<Header.CollisionCount; i++) {
         Collision collision <name="Collision", bgcolor=0x263f2a, read=ReadID>;
     }
 } Collisions <name="Collisions">;
-
+*/
 string ReadID(Collision &c) {
     char HeadID[3], TailID[3];
     uint headid, tailid; 
     if (c.CollisionShape != 1) {
         headid = c.HeadBoneID;
-        SPrintf(HeadID, "%d", headid);
+        SPrintf(HeadID, "%03d", headid);
         return "HeadID=" + HeadID;        
     } 
     else {
         headid = c.HeadBoneID;
         tailid = c.TailBoneID;
-        SPrintf(HeadID, "%d", headid);
-        SPrintf(TailID, "%d", tailid);
+        SPrintf(HeadID, "%03d", headid);
+        SPrintf(TailID, "%03d", tailid);
         return "HeadID=" + HeadID + " , " +"TailID="+ TailID;
     }
 }
